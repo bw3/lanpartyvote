@@ -138,7 +138,7 @@ var app = new Vue({
   methods: {
     loadGames: function() {
       this.refresh_status = '🟡'
-      fetch(window.location.origin + '/game/?sort_order=' + this.sort_order  + '&uid='+this.uid)
+      fetch(window.location.origin + window.location.pathname + 'game/?sort_order=' + this.sort_order  + '&uid='+this.uid)
         .then( response => {
             if (!response.ok) {
                 throw new Error('Server responding with '+response.status + ' ' + response.statusText);
@@ -155,7 +155,7 @@ var app = new Vue({
         })
     },
     loadGame: function(event) {
-      fetch(window.location.origin + '/game/'+ event.target.getAttribute("gameid"))
+      fetch(window.location.origin + window.location.pathname + 'game/'+ event.target.getAttribute("gameid"))
         .then( response => {
             if (!response.ok) {
                 throw new Error('Server responding with '+response.status + ' ' + response.statusText);
@@ -177,7 +177,7 @@ var app = new Vue({
         }
     },
     createUser: function(event) {
-      fetch(window.location.origin + '/user/', {
+      fetch(window.location.origin + window.location.pathname + 'user/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json;charset=utf-8'
@@ -208,7 +208,7 @@ var app = new Vue({
       })
     },
     changeUsername: function(event) {
-      fetch(window.location.origin + '/user/' + this.uid, {
+      fetch(window.location.origin + window.location.pathname + 'user/' + this.uid, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json;charset=utf-8'
@@ -238,7 +238,7 @@ var app = new Vue({
       this.loadGames()
     },
     deleteUser: function(event) {
-      fetch(window.location.origin + '/user/' + this.uid, {
+      fetch(window.location.origin + window.location.pathname + 'user/' + this.uid, {
         method: 'DELETE',
       })
       .then( response => {
@@ -265,7 +265,7 @@ var app = new Vue({
       this.page = 'edit-game';
     },
     saveGame: function(event) {
-      fetch(window.location.origin + '/game/', {
+      fetch(window.location.origin + window.location.pathname + 'game/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json;charset=utf-8'
@@ -292,7 +292,7 @@ var app = new Vue({
       if( vote_value == event.target.getAttribute("old-vote-value") ) {
         vote_value = 0;
       }
-      fetch(window.location.origin + '/vote/?sort_order=' + this.sort_order, {
+      fetch(window.location.origin + window.location.pathname + 'vote/?sort_order=' + this.sort_order, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json;charset=utf-8'
