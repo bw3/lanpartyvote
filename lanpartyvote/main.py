@@ -100,7 +100,7 @@ def save_game():
     delete = json.get("delete", False)
     try:
         if game_id is None:
-            cur.execute('INSERT INTO games (name,disk_usage,info,players) VALUES (?,?,?,?)', (json["name"],json.get("disk_usage",""),json.get("info",""),json.get("players")))
+            cur.execute('INSERT INTO games (name,disk_usage,info,players) VALUES (?,?,?,?)', (json["name"],json.get("disk_usage",""),json.get("info",""),json.get("players","")))
         elif delete:
             cur.execute('DELETE FROM games WHERE id = ?', (game_id,))
         else:
