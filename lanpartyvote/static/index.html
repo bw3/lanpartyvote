@@ -1,0 +1,340 @@
+<html>
+<head>
+<title>LAN Party Vote</title>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1"></meta>
+</head>
+<body>
+<div id="app" style="width:100%;">
+
+<div v-if="page === 'error'" class="column-right">
+Error:
+<br/>
+{{ error_msg }}
+<hr/>
+<a v-on:click="page = 'home'" href="#">Back</a>
+<hr/>
+</div>
+
+
+<div v-if="page === 'home'" class="column-left">
+<div style="float: right;" v-if="username === ''"><a v-on:click="page = 'login'" href="#">Select Username</a></div>
+<div style="float: right;" v-if="username != ''"><a v-on:click="page = 'user'" href="#">{{ username }}</a></div>
+<h1>LAN Party Vote</h1>
+<hr/>
+<a  v-on:click="createGame" href="#">Add Game</a>
+ |  <label for="sort-order">Sort By </label><select id="sort-order" v-model="sort_order" v-on:click="loadGames" v-on:keyup="loadGames">
+        <option value="name">Name</option>
+        <option value="score">Score</option>
+        <option value="upvotes">Upvotes</option>
+    </select>
+ | <input type=checkbox v-model="autorefresh" id="autorefresh" v-on:change="loadGames"/><label for="autorefresh">Auto Refresh</label>
+ | <a  v-on:click="loadGames" href="#">Refresh Now</a> {{ refresh_status }}
+<hr/>
+<table>
+<tr v-for="game in games">
+    <td v-on:click="vote" v-bind:gameid="game[4]" width=50 v-bind:old-vote-value="game[3]" new-vote-value=1  v-bind:style="voteValueToStyle(game[3],  1)">👍️ {{ game[0] }}</td>
+    <td v-on:click="vote" v-bind:gameid="game[4]" width=50 v-bind:old-vote-value="game[3]" new-vote-value=-1 v-bind:style="voteValueToStyle(game[3], -1)">👎️ {{ game[1] }}</td>
+    <td width=50>{{ game[2] }}</td>
+    <td><a v-on:click="loadGame" v-bind:gameid="game[4]" href="#">{{ game[5] }}</a></td>
+    <td width=20></td>
+    <td width=80>{{ game[6] }}<span v-if="game[6].length > 0"> GB</span></td>
+    <td>{{ game[7] }}<span v-if="game[7].length > 0"> players</span></td>
+</tr>
+</table>
+<hr/>
+Users: {{ users.toString() }}
+<hr/>
+</div>
+
+<div v-if="page === 'login'" class="column-right">
+<h2>Select Username</h2>
+<hr/>
+<a v-on:click="page = 'home'" href="#">Back</a>
+<hr/>
+Username: <input v-model="username"/>
+<br/>
+<a  v-on:click="createUser" href="#">Submit</a>
+<hr/>
+</div>
+
+<div v-if="page === 'user'" class="column-right">
+<h2>Username: {{ username }}</h2>
+<hr/>
+<a v-on:click="page = 'home'" href="#">Back</a>
+<hr/>
+User ID: {{ uid }}
+<hr/>
+Change username: <input v-model="username"/>
+<br/>
+<a  v-on:click="changeUsername" href="#">Save</a>
+<hr/>
+<a  v-on:click="logoutUser" href="#">Logout</a><div style="float: right;"><a v-on:click="deleteUser" href="#">Delete</a></div>
+<hr/>
+</div>
+
+<div v-if="page === 'view-game'" class="column-right">
+<h1>{{ cur_game.name }}</h1>
+<hr/>
+<a v-on:click="page = 'home'" href="#">Back</a>
+ | <a v-on:click="page = 'edit-game'" href="#">Edit</a>
+<hr/>
+Disk Usage: {{ cur_game.disk_usage }}<span v-if="cur_game.disk_usage.length > 0"> GB</span>
+<br/>
+Players: {{ cur_game.players }}<span v-if="cur_game.players.length > 0"> players</span>
+<hr/>
+<table>
+<tr><td width=50>👍️ {{ cur_game.upvotes.length }}</td><td>{{ cur_game.upvotes.toString() }}</td></tr>
+<tr height=3/>
+<tr><td>👎️ {{ cur_game.downvotes.length }}</td><td>{{ cur_game.downvotes.toString() }}</td></tr>
+</table>
+<hr/>
+<span v-html="cur_game.info_html"></span>
+<hr v-if="cur_game.info_html.length > 0"/>
+</div>
+
+<div v-if="page === 'edit-game'" class="column-right">
+<h2><span v-if="cur_game.id == null">Add</span><span v-if="cur_game.id != null">Edit</span> Game</h2>
+<hr/>
+<a v-on:click="page = 'home'" href="#">Back</a>
+<hr/>
+Name: <input v-model="cur_game.name"/><br/>
+Disk Usage <input v-model="cur_game.disk_usage"/> GB<br/>
+Suggested Numbers of Players <input v-model="cur_game.players"/><br/>
+Additional Info (Markdown):
+<textarea v-model="cur_game.info" style="width:100%;height:70%"></textarea>
+<hr/>
+<div v-if="cur_game.id != null">
+<input type=checkbox v-model="cur_game.delete" id="cur_game_delete"/><label for="cur_game_delete">Delete</label>
+<hr/>
+</div>
+<a v-on:click="saveGame" href="#">Save</a>
+</div>
+
+</div>
+<script>
+var app = new Vue({
+  el: '#app',
+  data: {
+    page: 'home',
+    add_game_name: '',
+    username: '',
+    uid: '',
+    users: [],
+    games: [],
+    cur_game: {},
+    refresh_status: 'Not loaded',
+    sort_order: 'name',
+    autorefresh: true
+  },
+  created: function() {
+    if( localStorage.username && localStorage.uid ) {
+        this.username = localStorage.username;
+        this.uid = localStorage.uid;
+    }
+    this.periodicFunction();
+    setInterval(this.periodicFunction, 15000);
+  },
+  methods: {
+    loadGames: function() {
+      this.refresh_status = '🟡'
+      fetch(window.location.origin + '/game/?sort_order=' + this.sort_order  + '&uid='+this.uid)
+        .then( response => {
+            if (!response.ok) {
+                throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then( data => {
+            this.games = data.games;
+            this.users = data.users;
+            this.refresh_status = '🟢';
+        })
+        .catch( error => {
+            this.refresh_status = '🔴';
+        })
+    },
+    loadGame: function(event) {
+      fetch(window.location.origin + '/game/'+ event.target.getAttribute("gameid"))
+        .then( response => {
+            if (!response.ok) {
+                throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then( data => {
+            this.cur_game = data;
+            this.page = 'view-game';
+        })
+        .catch( error => {
+        })
+    },
+    periodicFunction: function() {
+        if(this.autorefresh) {
+            this.loadGames();
+        } else {
+            this.refresh_status = '🔴';
+        }
+    },
+    createUser: function(event) {
+      fetch(window.location.origin + '/user/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify({username:this.username})
+      })
+      .then( response => {
+        if (!response.ok) {
+            throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then( data => {
+        this.uid = data.id;
+        localStorage.username = this.username;
+        localStorage.uid = this.uid;
+        this.page = 'home';
+        this.loadGames()
+      })
+      .catch( error => {
+          this.error_msg = error;
+          this.page = 'error';
+          this.username = '';
+          this.uid = '';
+          localStorage.username = this.username;
+          localStorage.uid = this.uid;
+
+      })
+    },
+    changeUsername: function(event) {
+      fetch(window.location.origin + '/user/' + this.uid, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify({username:this.username})
+      })
+      .then( response => {
+        if (!response.ok) {
+            throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then( data => {
+        this.page = 'home';
+      })
+      .catch( error => {
+          this.error_msg = error;
+          this.page = 'error';
+      })
+    },
+    logoutUser: function(event) {
+      this.uid = '';
+      this.username = '';
+      localStorage.username = this.username;
+      localStorage.uid = this.uid;
+      this.page = 'home';
+      this.loadGames()
+    },
+    deleteUser: function(event) {
+      fetch(window.location.origin + '/user/' + this.uid, {
+        method: 'DELETE',
+      })
+      .then( response => {
+        if (!response.ok) {
+            throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then( data => {
+        this.uid = '';
+        this.username = '';
+        localStorage.username = this.username;
+        localStorage.uid = this.uid;
+        this.page = 'home';
+        this.loadGames()
+      })
+      .catch( error => {
+          this.error_msg = error;
+          this.page = 'error';
+      })
+    },
+    createGame: function(event) {
+      this.cur_game = {};
+      this.page = 'edit-game';
+    },
+    saveGame: function(event) {
+      fetch(window.location.origin + '/game/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify(this.cur_game)
+      })
+      .then( response => {
+        if (!response.ok) {
+            throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then( data => {
+        this.loadGames();
+        this.page = 'home';
+      })
+      .catch( error => {
+          this.error_msg = error;
+          this.page = 'error';
+      })
+    },
+    vote: function(event) {
+      vote_value = event.target.getAttribute("new-vote-value")
+      if( vote_value == event.target.getAttribute("old-vote-value") ) {
+        vote_value = 0;
+      }
+      fetch(window.location.origin + '/vote/?sort_order=' + this.sort_order, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify({uid:this.uid, username:this.username, gameid:event.target.getAttribute("gameid"), value:vote_value})
+      })
+      .then( response => {
+        if (!response.ok) {
+            if(response.status == 403) {
+                this.page = 'login';
+                this.username = '';
+                this.uid = '';
+                localStorage.username = this.username;
+                localStorage.uid = this.uid;
+                return null;
+            } else {
+                throw new Error('Server responding with '+response.status + ' ' + response.statusText);
+            }
+        }
+        return response.json();
+      })
+      .then( data => {
+        if( data != null ) {
+          this.games = data.games;
+          this.page = 'home';
+        }
+      })
+      .catch( error => {
+          this.error_msg = error;
+          this.page = 'error';
+      })
+
+    },
+    voteValueToStyle: function(val1, val2) {
+        if(val1 == val2) {
+          return 'background-color: lightcyan;'
+        } else {
+          return 'background-color: white;'
+        }
+    }
+  }
+});
+</script>
+</body>
+</html>
