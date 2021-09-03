@@ -31,6 +31,9 @@ Error:
  | <input type=checkbox v-model="autorefresh" id="autorefresh" v-on:change="loadGames"/><label for="autorefresh">Auto Refresh</label>
  | <a  v-on:click="loadGames" href="#">Refresh Now</a> {{ refresh_status }}
 <hr/>
+<span v-if="username === ''"><a v-on:click="page = 'login'" href="#">Select username to vote</a></span>
+<span v-if="username != ''">Click thumbs to vote</span>
+<hr/>
 <table>
 <tr v-for="game in games">
     <td v-on:click="vote" v-bind:gameid="game[4]" width=50 v-bind:old-vote-value="game[3]" new-vote-value=1  v-bind:style="voteValueToStyle(game[3],  1)">👍️ {{ game[0] }}</td>

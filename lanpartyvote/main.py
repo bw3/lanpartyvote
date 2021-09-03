@@ -140,7 +140,7 @@ def list_games(uid=None):
         GROUP BY games.id
     """ + order_by, (uid,) )
     games = cur.fetchall()
-    cur.execute("SELECT username FROM users")
+    cur.execute("SELECT username FROM users ORDER BY username ASC")
     users = []
     for user in cur.fetchall():
         users.append(user[0])
